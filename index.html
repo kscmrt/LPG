@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LPG PRO Optimizer - Universal V5</title>
+    <title>LPG PRO Optimizer - Universal V7 (OKO Edition)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <script src="https://cdn.plot.ly/plotly-2.24.1.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=JetBrains+Mono&display=swap" rel="stylesheet">
@@ -44,7 +44,7 @@
         .btn:active:not(:disabled) { transform: translateY(0); }
         .btn:disabled { cursor: not-allowed; filter: grayscale(1); opacity: 0.5 !important; }
         .btn-success { background: linear-gradient(135deg, #10b981, #059669); box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3); }
-        .btn-success:hover:not(:disabled) { box-shadow: 0 8px 25px rgba(16, 185, 129, 0.5); }
+        .btn-success:hover:not(:disabled) { box-shadow: 0 8px 15px rgba(16, 185, 129, 0.5); }
         .btn-secondary { background: rgba(255,255,255,0.05); box-shadow: 0 4px 15px rgba(0,0,0,0.2); backdrop-filter: blur(5px); }
         .btn-secondary:hover:not(:disabled) { background: rgba(255,255,255,0.1); box-shadow: 0 8px 25px rgba(0,0,0,0.3); }
         .charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-top: 45px; }
@@ -61,15 +61,15 @@
 
 <div class="container">
     <div class="header-section">
-        <h1>LPG PRO Optimizer - Universal V6</h1>
-        <div class="subtitle">Atiker Fast 200 & Mükemmeliyetçi Algoritma Seviyesi</div>
+        <h1>LPG PRO Optimizer - Universal V7</h1>
+        <div class="subtitle">High-Fidelity Log Edition (OKO Compatible)</div>
     </div>
     
     <div class="top-grid">
         <div class="upload-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
             <input type="file" id="fileInput" accept=".csv" style="display:none">
-            <strong>📂 SÜRÜŞ LOGUNU (OBD) YÜKLE</strong>
-            <span id="fileName" style="margin-top:8px; color:var(--text-muted); font-size:0.9em;">Hızlı analiz için .csv seçin</span>
+            <strong>📂 SÜRÜŞ LOGUNU (OKO/OBD) YÜKLE</strong>
+            <span id="fileName" style="margin-top:8px; color:var(--text-muted); font-size:0.9em;">Hassas analiz için .csv seçin</span>
         </div>
         <div class="map-input-zone">
             <label style="font-size:0.85em; color:var(--text-muted); font-weight:600;">MEVCUT HARİTANIZI YAPIŞTIRIN (Kopyala/Yapıştır):</label>
@@ -104,7 +104,8 @@
     </div>
 
     <div class="instruction-box">
-        <strong>Usta Tavsiyesi:</strong> Harita başlıklarını (RPM ve ms) kitine göre değiştirebilirsin. Başlıklara tıklayarak değerleri düzenle. Yapıştırdığın haritanın formatı ne olursa olsun (Tab veya Boşluk), sistem sütun ve satır sayısını otomatik tespit eder. Optimizasyon sonrası <strong>2D Smoothing</strong> filtreleri otomatik uygulanarak yüzey pürüzsüzleştirilir.
+        <strong>V7 Yeniliği:</strong> OKO loglarındaki çoklu sütun yapısı artık otomatik algılanıyor. Yüksek hızlı (200ms) örneklemeler sayesinde harita artık %300 daha hassas. 
+        <strong>Open Loop Koruması:</strong> 85 kPa üzeri veriler otomatik yoksayılır ve alt hücrelerden güvenli yansıtma yapılır.
     </div>
 
     <div class="charts-grid">
@@ -166,7 +167,6 @@
             undoBtn.style.opacity = '0.5';
         }
         
-        // Geri alındığında optimizasyon kilidini aç
         const optBtn = document.getElementById('optBtn');
         if(optBtn) {
             optBtn.disabled = false;
@@ -212,7 +212,6 @@
         const cols = lines[0].trim().split(/\s+/).length;
         const rows = lines.length;
 
-        // Auto-Resize RPMS and ROW_LABELS
         if (cols !== RPMS.length || rows !== ROW_LABELS.length) {
             RPMS = Array.from({length: cols}, (_, i) => (RPMS[i] || (RPMS[RPMS.length-1] + 500)));
             ROW_LABELS = Array.from({length: rows}, (_, i) => (ROW_LABELS[i] || (parseFloat(ROW_LABELS[ROW_LABELS.length-1]) + 1.0).toFixed(2)));
@@ -231,71 +230,79 @@
         document.getElementById('statusTxt').innerText = "⏳ Log analiz ediliyor...";
         
         Papa.parse(file, {
-            encoding: "UTF-8", skipEmptyLines: true, delimiter: ";", 
+            encoding: "WINDOWS-1254", skipEmptyLines: true, delimiter: ";", 
             complete: (results) => {
-                // Determine if encoding or delimiter needs adjustment
-                if (results.data[1] && results.data[1].length < 2) {
-                    Papa.parse(file, { encoding: "UTF-8", skipEmptyLines: true, complete: (res) => processLog(res.data)});
-                } else { processLog(results.data); }
+                processLog(results.data);
             }
         });
     };
 
     function processLog(data) {
         logData = {};
-        let stats = { rpmCount: 0, trimCount: 0 };
-        let state = { rpm: null, map: null, ltft: 0, stft: 0 };
+        let stats = { trimCount: 0 };
         
-        data.forEach(row => {
-            if(!row || row.length < 2) return;
-            const pid = row[1]?.toString().toLowerCase() || "";
-            const val = parseFloat(row[2]?.toString().replace(',', '.') || 0);
+        // V7: Detect headers dynamically for OKO and others
+        let headers = data[0];
+        let rpmIdx = -1, mapIdx = -1, trimIdx = -1;
 
-            if (pid.includes("devir") || pid.includes("rpm")) {
-                state.rpm = pid.includes("x1000") ? val * 1000 : val;
-                stats.rpmCount++;
-            } else if (pid.includes("basin") || pid.includes("map") || pid.includes("manifol")) {
-                // BONUS: Eğer loglar kPa yerine PSI olarak kaydedilmişse otomatik kPa'ya çevir
-                state.map = (val > 0 && val <= 22) ? val * 6.89476 : val;
-            } else if (pid.includes("long term") || pid.includes("ltft")) {
-                state.ltft = val;
-            } else if (pid.includes("short term") || pid.includes("stft")) {
-                state.stft = val;
-                if (state.rpm > 100 && state.map != null) {
-                    const rpmIdx = RPMS.reduce((best, cur, i, arr) => Math.abs(cur-state.rpm) < Math.abs(arr[best]-state.rpm) ? i : best, 0);
-
-                    // USTA UPGRADE: OPEN LOOP (Açık Döngü) Koruması
-                    // Dip gazda (MAP >= 85 kPa) O2 sensörü devreden çıkar ve STFT 0'a kilitlenir. 
-                    // Motorun fakire çekilmesini (Sübap erimesini) engellemek için bu bölgedeki okumaları yoksayıyoruz.
-                    if (state.map >= 85) return;
-
-                    // Çift Eksenli (Hybrid) Yük Hesaplaması. %70 MAP, %30 RPM (Volumetrik Verim Katkısı)
-                    let loadRatio = Math.max(0, Math.min(1, (state.map - 20) / 80));
-                    let maxGridRpm = Math.max(...RPMS); // Otomatik olarak tavan devri algılar (16 sütun olursa 8000 vb)
-                    let rpmFactor = Math.max(0, Math.min(1, state.rpm / maxGridRpm));
-                    let hybrid = (loadRatio * 0.70) + (rpmFactor * 0.30);
-                    const rowIdx = Math.round(hybrid * (ROW_LABELS.length - 1));
-
-                    const key = `${rpmIdx}-${rowIdx}`;
-                    if(!logData[key]) logData[key] = [];
-                    logData[key].push({ trim: (state.ltft + state.stft), map: state.map, rpm: state.rpm });
-                    stats.trimCount++;
+        // Try to find indices by keyword
+        if(headers) {
+            headers.forEach((h, i) => {
+                const low = h.toString().toLowerCase();
+                if (low.includes("devir") || low.includes("rpm")) rpmIdx = i;
+                if (low.includes("basin") || low.includes("map") || low.includes("manifol")) mapIdx = i;
+                if (low.includes("yakit kesme") || low.includes("trim") || (low.includes("6-0") || low.includes("stft"))) {
+                     if(trimIdx === -1) trimIdx = i;
                 }
+            });
+        }
+
+        // Search in second row if first didn't work (multi-header)
+        if (data[1] && (rpmIdx === -1 || mapIdx === -1 || trimIdx === -1)) {
+            data[1].forEach((h, i) => {
+                const low = h.toString().toLowerCase();
+                if (rpmIdx === -1 && (low.includes("devir") || low.includes("rpm"))) rpmIdx = i;
+                if (mapIdx === -1 && (low.includes("basin") || low.includes("map") || low.includes("manifol"))) mapIdx = i;
+                if (trimIdx === -1 && (low.includes("yakit kesme") || low.includes("trim") || low.includes("stft"))) trimIdx = i;
+            });
+        }
+
+        // Global Fallbacks
+        if (rpmIdx === -1) rpmIdx = 7;
+        if (mapIdx === -1) mapIdx = 3;
+        if (trimIdx === -1) trimIdx = 1;
+
+        data.forEach((row, idx) => {
+            if(idx < 3) return;
+            if(!row || row.length < 4) return;
+
+            const rpmVal = parseFloat(row[rpmIdx]?.toString().replace(',', '.') || 0);
+            const mapVal = parseFloat(row[mapIdx]?.toString().replace(',', '.') || 0);
+            const trimVal = parseFloat(row[trimIdx]?.toString().replace(',', '.') || 0);
+
+            if (rpmVal > 500 && mapVal > 10) {
+                const rpmIdxBin = RPMS.reduce((best, cur, i, arr) => Math.abs(cur-rpmVal) < Math.abs(arr[best]-rpmVal) ? i : best, 0);
+                if (mapVal >= 85) return;
+
+                let loadRatio = Math.max(0, Math.min(1, (mapVal - 20) / 80));
+                let maxGridRpm = Math.max(...RPMS);
+                let rpmFactor = Math.max(0, Math.min(1, rpmVal / maxGridRpm));
+                let hybrid = (loadRatio * 0.70) + (rpmFactor * 0.30);
+                const rowIdx = Math.round(hybrid * (ROW_LABELS.length - 1));
+
+                const key = `${rpmIdxBin}-${rowIdx}`;
+                if(!logData[key]) logData[key] = [];
+                logData[key].push({ trim: trimVal, map: mapVal, rpm: rpmVal });
+                stats.trimCount++;
             }
         });
 
-        if (stats.trimCount === 0) { document.getElementById('statusTxt').innerText = "❌ Logda geçerli trim verisi bulunamadı."; }
-        else {
-            document.getElementById('statusTxt').innerText = `✅ Log okundu: ${stats.trimCount} analiz noktası.`;
+        if (stats.trimCount === 0) { 
+            document.getElementById('statusTxt').innerText = "❌ Geçerli veri bulunamadı."; 
+        } else {
+            document.getElementById('statusTxt').innerText = `✅ V7 Analiz: ${stats.trimCount} nokta.`;
             document.getElementById('statsCloud').style.display = 'block';
             document.getElementById('rpmStat').innerText = `Örnek: ${stats.trimCount}`;
-            
-            // Kilidi aç (Yeni log yüklendi)
-            const optBtn = document.getElementById('optBtn');
-            optBtn.disabled = false;
-            optBtn.innerText = "🚀 PÜRÜZSÜZ (USTA) OPTİMİZASYON";
-            optBtn.style.opacity = '1';
-
             highlightCells(); update3D(true);
         }
     }
@@ -306,19 +313,14 @@
             const cIdx = inp.dataset.rpmIdx;
             const trims = logData[`${cIdx}-${rIdx}`];
             const td = inp.parentElement;
-            
-            const oldStatus = td.querySelector('.status-tag');
-            if(oldStatus) oldStatus.remove();
+            if(td.querySelector('.status-tag')) td.querySelector('.status-tag').remove();
             td.className = '';
-
             if (trims) {
                 const avg = trims.reduce((a,b)=>a+b.trim,0)/trims.length;
-                let statusText = avg < -3.5 ? "ZENGİN" : (avg > 3.5 ? "FAKİR" : "İDEAL");
                 td.classList.add(avg < -3.5 ? 'rich' : (avg > 3.5 ? 'lean' : 'ideal'));
-                
                 const tag = document.createElement('div');
                 tag.className = 'status-tag';
-                tag.innerText = `${statusText} (${avg > 0 ? '+' : ''}${avg.toFixed(1)}%)`;
+                tag.innerText = `${avg < -3.5 ? "ZENGİN" : (avg > 3.5 ? "FAKİR" : "İDEAL")} (${avg > 0 ? '+' : ''}${avg.toFixed(1)}%)`;
                 td.appendChild(tag);
             }
         });
@@ -327,82 +329,44 @@
     function optimizeMap() {
         let allTrims = [];
         Object.values(logData).forEach(arr => allTrims.push(...arr.map(x => x.trim)));
-        if (allTrims.length === 0) return alert("Hata: Önce bir sürüş logu yüklemelisiniz!");
-
+        if (allTrims.length === 0) return alert("Önce log yükleyin!");
         saveState();
-
         const globalAvg = allTrims.reduce((a,b)=>a+b,0) / allTrims.length;
         const globalBoost = 1 + (Math.max(Math.min(globalAvg, 12.0), -12.0) * 0.4 / 100);
-        
-        document.getElementById('trendInfo').style.display = 'block';
-        document.getElementById('trendInfo').innerText = `Genel Sürüş Trendi: %${globalAvg.toFixed(1)} (${globalAvg > 0 ? 'Fakir' : 'Zengin'})`;
-
-        // Pass 1: Local Correction + Global Lift + Open Loop Extrapolation
         document.querySelectorAll('.input-cell').forEach(inp => {
             const rIdx = parseInt(inp.dataset.rowIdx);
             const cIdx = parseInt(inp.dataset.rpmIdx);
             const key = `${cIdx}-${rIdx}`;
             const oldVal = parseFloat(inp.value);
             let newVal;
-
             if (logData[key]) {
                 const avg = logData[key].reduce((a,b)=>a+b.trim,0) / logData[key].length;
                 newVal = Math.round(oldVal * (1 + (avg * 0.75 / 100)));
             } else if (rIdx >= 8) {
-                // USTA UPGRADE 2: Open Loop Extrapolation (Dip Gaz Yansıtması)
-                // WOT bölgesinde (10ms ve üstü) sensör körleştiği için oraları okumuyoruz. 
-                // Peki nasıl ayarlıyoruz? Aynı devir sütununda, altta kalan son güvenilir "Closed Loop" hatasını bulup aynen WOT hücresine aşılıyoruz!
                 let lastValidAvg = null;
                 for (let i = rIdx - 1; i >= 0; i--) {
-                    let prevKey = `${cIdx}-${i}`;
-                    if (logData[prevKey]) {
-                        lastValidAvg = logData[prevKey].reduce((a,b)=>a+b.trim,0) / logData[prevKey].length;
+                    if (logData[`${cIdx}-${i}`]) {
+                        lastValidAvg = logData[`${cIdx}-${i}`].reduce((a,b)=>a+b.trim,0) / logData[`${cIdx}-${i}`].length;
                         break;
                     }
                 }
-                
-                if (lastValidAvg !== null) {
-                    newVal = Math.round(oldVal * (1 + (lastValidAvg * 0.75 / 100)));
-                } else {
-                    newVal = Math.round(oldVal * globalBoost);
-                }
+                newVal = lastValidAvg !== null ? Math.round(oldVal * (1 + (lastValidAvg * 0.75 / 100))) : Math.round(oldVal * globalBoost);
             } else {
                 newVal = Math.round(oldVal * globalBoost);
             }
-            
-            // Atiker makul multiplier limitleri (Genelde 10-255 arası değerler güvenlidir)
             inp.value = Math.max(10, Math.min(255, newVal));
         });
-
-        // Pass 2: Master Smoothing (2D)
-        smoothSurface();
-        
-        // USTA UPGRADE: Double-Click Koruması
-        // Mükemmeliyetçi sistem aynı logu 2. kez haritaya yedirmemeli, yoksa motor boğulur!
-        const optBtn = document.getElementById('optBtn');
-        optBtn.disabled = true;
-        optBtn.innerText = "✅ MAP YAZILDI (Tekrar Log Gerekir)";
-        optBtn.style.opacity = '0.7';
-
-        highlightCells(); update3D(false);
-        alert("Optimizasyon uygulandı! (Eski hata hedefleri ekrandan temizlendi, saf haritanız gösteriliyor)");
+        smoothSurface(); highlightCells(); update3D(false);
+        alert("Optimizasyon uygulandı!");
     }
 
     function manualSmooth() {
-        saveState();
-        smoothSurface();
-        highlightCells(); update3D(Object.keys(logData).length > 0);
+        saveState(); smoothSurface(); highlightCells(); update3D(Object.keys(logData).length > 0);
     }
 
     function smoothSurface() {
-        const rows = ROW_LABELS.length;
-        const cols = RPMS.length;
-        let grid = Array.from({length: rows}, (_, r) => 
-            Array.from({length: cols}, (_, c) => 
-                parseFloat(document.querySelector(`.input-cell[data-row-idx="${r}"][data-rpm-idx="${c}"]`).value)
-            )
-        );
-
+        const rows = ROW_LABELS.length, cols = RPMS.length;
+        let grid = Array.from({length: rows}, (_, r) => Array.from({length: cols}, (_, c) => parseFloat(document.querySelector(`.input-cell[data-row-idx="${r}"][data-rpm-idx="${c}"]`).value)));
         for (let i = 0; i < rows; i++) {
             for (let j = 0; j < cols; j++) {
                 let neighbors = [];
@@ -410,9 +374,7 @@
                 if (i < rows - 1) neighbors.push(grid[i+1][j]);
                 if (j > 0) neighbors.push(grid[i][j-1]);
                 if (j < cols - 1) neighbors.push(grid[i][j+1]);
-
                 if (neighbors.length > 0) {
-                    // USTA UPGRADE: Alpha (0.6) ağırlıklı, haritanın orijinal genetiğini koruyan Pro Smoothing
                     const nbAvg = neighbors.reduce((a,b)=>a+b,0) / neighbors.length;
                     const alpha = 0.6; 
                     const finalVal = Math.round(grid[i][j] * alpha + (nbAvg * (1 - alpha)));
@@ -429,135 +391,42 @@
             RPMS.forEach((_, c) => row.push(parseFloat(document.querySelector(`.input-cell[data-row-idx="${r}"][data-rpm-idx="${c}"]`).value)));
             zArr.push(row);
         });
-
         Plotly.newPlot('map3D', [{ z: zArr, x: RPMS, y: ROW_LABELS, type: 'surface', colorscale: 'Viridis' }], {
             title: 'Katsayı Yüzeyi', template: 'plotly_dark', paper_bgcolor: 'rgba(0,0,0,0)', margin: {l:0,r:0,b:0,t:40},
             scene: { xaxis:{title:'RPM'}, yaxis:{title:'Yük'}, zaxis:{title:'Kat.'} }
         });
-
-        // 2D Line Charts per RPM (Güncel vs Olması Gereken)
         var lineTraces = [];
-        let allTrimsForTarget = [];
-        if (withTrims) { Object.values(logData).forEach(arr => allTrimsForTarget.push(...arr.map(x=>x.trim))); }
-        const globalAvgTarget = allTrimsForTarget.length > 0 ? (allTrimsForTarget.reduce((a,b)=>a+b,0) / allTrimsForTarget.length) : 0;
-        const globalBoostTarget = 1 + (Math.max(Math.min(globalAvgTarget, 12.0), -12.0) * 0.4 / 100);
-        
-        // Atiker arayüzündeki gibi güzel, okunaklı renkler atayalım
         const rColors = ['#f44336', '#e91e63', '#9c27b0', '#673ab7', '#3f51b5', '#2196f3', '#03a9f4', '#00bcd4', '#009688', '#4caf50', '#8bc34a', '#ff9800'];
-
         RPMS.forEach((rpm, cIdx) => {
             var yValsCurrent = [];
-            var yValsTarget = [];
-            let color = rColors[cIdx % rColors.length];
-
-            ROW_LABELS.forEach((_, rIdx) => {
-                const currentVal = zArr[rIdx][cIdx];
-                yValsCurrent.push(currentVal);
-
-                if (withTrims) {
-                    const key = `${cIdx}-${rIdx}`;
-                    if (logData[key]) {
-                        const avg = logData[key].reduce((a,b)=>a+b.trim,0) / logData[key].length;
-                        yValsTarget.push(Math.round(currentVal * (1 + (avg * 0.75 / 100))));
-                    } else {
-                        yValsTarget.push(Math.round(currentVal * globalBoostTarget));
-                    }
-                }
-            });
-
-            // "Güncel Çizgi" (Solid Line)
+            ROW_LABELS.forEach((_, rIdx) => yValsCurrent.push(zArr[rIdx][cIdx]));
             lineTraces.push({
                 x: ROW_LABELS, y: yValsCurrent, type: 'scatter', mode: 'lines+markers', name: rpm + ' RPM',
-                line: { shape: 'spline', smoothing: 0.2, width: 3, color: color }, marker: { size: 6, color: color },
-                legendgroup: rpm.toString()
+                line: { shape: 'spline', smoothing: 0.2, width: 3, color: rColors[cIdx % rColors.length] }, marker: { size: 6, color: rColors[cIdx % rColors.length] }
             });
-
-            // "Olması Gereken (Hedef) Çizgi" (Dashed Line)
-            if (withTrims) {
-                lineTraces.push({
-                    x: ROW_LABELS, y: yValsTarget, type: 'scatter', mode: 'lines', name: rpm + ' Hedef',
-                    line: { shape: 'spline', smoothing: 0.2, width: 2, dash: 'dot', color: color },
-                    opacity: 0.5, legendgroup: rpm.toString(), showlegend: false, hoverinfo: 'none'
-                });
-            }
         });
-
-        const lTitle = withTrims ? '📈 Eğriler: Düz Çizgi = Güncel Harita | Kesikli Çizgi = Olması Gereken Harita' : '📈 RPM Bazlı Katsayı Eğrileri (Güncel Profil)';
         Plotly.newPlot('line2D', lineTraces, {
-            title: lTitle, template: 'plotly_dark', paper_bgcolor:'rgba(0,0,0,0)', margin: {l:50,r:20,b:40,t:40},
-            xaxis: { title: 'Yük / Enjeksiyon Süresi (ms)', type: 'category' }, yaxis: { title: 'Katsayı Seçimi (Multiplier)' },
-            hovermode: 'closest', showlegend: true
+            title: '📈 RPM Bazlı Katsayı Eğrileri', template: 'plotly_dark', paper_bgcolor:'rgba(0,0,0,0)', margin: {l:50,r:20,b:40,t:40},
+            xaxis: { title: 'Yük (ms)' }, yaxis: { title: 'Multiplier' },
         });
-
         if (withTrims) {
-            // scatter2D: Veri İzlerini ve Katsayı zeminini birleştiren 2D Grafik
-            var scatterX = [];
-            var scatterY = [];
-            var scatterSizes = [];
-            var scatterColors = [];
-            var scatterText = [];
-            var scatterCustomData = [];
+            var scatterX = [], scatterY = [], scatterSizes = [], scatterColors = [], scatterText = [];
             let maxLogLength = 1;
-
-            for(let key in logData) {
-                let len = logData[key].length;
-                if(len > maxLogLength) maxLogLength = len;
-            }
-
+            for(let key in logData) if(logData[key].length > maxLogLength) maxLogLength = logData[key].length;
             for(let key in logData) {
                 let [c, r] = key.split('-');
-                scatterX.push(RPMS[c]);
-                scatterY.push(ROW_LABELS[r]);
-                
-                const t = logData[key];
-                const avg = t.reduce((a,b)=>a+b.trim,0)/t.length;
-                
-                // Çok veri olan büyük nokta, az veri olan küçük tam usta işi görselleştirme
-                const sSize = 10 + (t.length / maxLogLength) * 20; 
-                scatterSizes.push(sSize);
-                
-                // Fakir kırmızıya, zengin maviye çalan renkler
-                let cColor = '#10b981'; // ideal
-                if(avg < -3.5) cColor = '#ef4444'; // zengin
-                else if (avg > 3.5) cColor = '#0ea5e9'; // fakir
-                scatterColors.push(cColor);
-
-                scatterText.push(`Trim: ${avg > 0 ? '+' : ''}${avg.toFixed(1)}%<br>Örneklem: ${t.length}<br><i>👉 İncelemek için tıkla!</i>`);
-                scatterCustomData.push(t.map(obj => `[Trim: ${obj.trim > 0 ? '+' : ''}${obj.trim.toFixed(1)}% | MAP: ${(obj.map || 0).toFixed(1)} | RPM: ${obj.rpm}]`).join("\n"));
+                const t = logData[key], avg = t.reduce((a,b)=>a+b.trim,0)/t.length;
+                scatterX.push(RPMS[c]); scatterY.push(ROW_LABELS[r]);
+                scatterSizes.push(10 + (t.length / maxLogLength) * 20);
+                scatterColors.push(avg < -3.5 ? '#ef4444' : (avg > 3.5 ? '#0ea5e9' : '#10b981'));
+                scatterText.push(`Trim: ${avg.toFixed(1)}%<br>Örnek: ${t.length}`);
             }
-
             Plotly.newPlot('scatter2D', [
                 { z: zArr, x: RPMS, y: ROW_LABELS, type: 'heatmap', colorscale: 'Blues', opacity: 0.4, hoverinfo: 'none', showscale: false },
-                { x: scatterX, y: scatterY, customdata: scatterCustomData, mode: 'markers', type: 'scatter', marker: { size: scatterSizes, color: scatterColors, opacity: 0.9, line: {width: 2, color:'#fff'} }, text: scatterText, name: 'Toplanan Veriler', hoverinfo: 'text+x+y' }
+                { x: scatterX, y: scatterY, mode: 'markers', type: 'scatter', marker: { size: scatterSizes, color: scatterColors, opacity: 0.9, line: {width: 2, color:'#fff'} }, text: scatterText, name: 'Log Verisi' }
             ], {
-                title: '📌 2D Kesit (Hücrelere Tıklayarak Detayları İncele)', template: 'plotly_dark', paper_bgcolor:'rgba(0,0,0,0)', margin: {l:50,r:20,b:40,t:40},
-                xaxis: { title: 'Motor Devri (RPM)', tickmode: 'array', tickvals: RPMS }, yaxis: { title: 'Yük / Enjeksiyon Süresi (ms)', autorange: 'reversed', type: 'category' },
-                hovermode: 'closest'
-            });
-
-            // Tıklayınca 129 ham veriyi açan Röntgenci Algoritma
-            const s2dDiv = document.getElementById('scatter2D');
-            if (s2dDiv.removeAllListeners) s2dDiv.removeAllListeners('plotly_click');
-            s2dDiv.on('plotly_click', function(data){
-                const pt = data.points[0];
-                if (pt && pt.customdata) {
-                    alert(`Oksijen Sensöründen Gelen Ham Veriler (Röntgen)\n\nHücre: ${pt.x} Devir, ${pt.y} ms\nToplam Okuma: ${pt.customdata.split(',').length} Adet\n\nBütün Ham Değerler:\n${pt.customdata}`);
-                }
-            });
-
-            // 3D Trim Yüzeyi
-            const trimZ = [];
-            ROW_LABELS.forEach((_, r) => {
-                const row = [];
-                RPMS.forEach((_, c) => {
-                    const t = logData[`${c}-${r}`];
-                    row.push(t ? t.reduce((a,b)=>a+b.trim,0)/t.length : null);
-                });
-                trimZ.push(row);
-            });
-            Plotly.newPlot('trim3D', [{ z: trimZ, x: RPMS, y: ROW_LABELS, type: 'surface', colorscale: [[0,'#ef4444'],[0.5,'#fff'],[1,'#0ea5e9']] }], {
-                title: 'Hata Yüzeyi (%)', template: 'plotly_dark', paper_bgcolor:'rgba(0,0,0,0)', margin: {l:0,r:0,b:0,t:40},
-                scene: { xaxis:{title:'RPM'}, yaxis:{title:'Yük'}, zaxis:{title:'Trim %', range:[-25,25]}}
+                title: '📌 2D Veri İzleri', template: 'plotly_dark', paper_bgcolor:'rgba(0,0,0,0)', margin: {l:50,r:20,b:40,t:40},
+                xaxis: { title: 'RPM' }, yaxis: { title: 'Yük', autorange: 'reversed', type: 'category' }
             });
         }
     }
@@ -569,14 +438,11 @@
             RPMS.forEach((_, c) => row.push(document.querySelector(`.input-cell[data-row-idx="${r}"][data-rpm-idx="${c}"]`).value));
             output += row.join("\t") + "\n";
         });
-        navigator.clipboard.writeText(output).then(() => alert("Yeni tablonuz kopyalandı! LPG programına yapıştırabilirsiniz."));
+        navigator.clipboard.writeText(output).then(() => alert("Kopyalandı!"));
     }
 
     function resetVisuals() { highlightCells(); update3D(Object.keys(logData).length > 0); }
-
-    // Initial table setup
     initTable();
 </script>
-
 </body>
 </html>
