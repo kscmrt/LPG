@@ -278,7 +278,7 @@
 
                     const key = `${rpmIdx}-${rowIdx}`;
                     if(!logData[key]) logData[key] = [];
-                    logData[key].push(state.ltft + state.stft);
+                    logData[key].push({ trim: (state.ltft + state.stft), map: state.map, rpm: state.rpm });
                     stats.trimCount++;
                 }
             }
@@ -312,7 +312,7 @@
             td.className = '';
 
             if (trims) {
-                const avg = trims.reduce((a,b)=>a+b,0)/trims.length;
+                const avg = trims.reduce((a,b)=>a+b.trim,0)/trims.length;
                 let statusText = avg < -3.5 ? "ZENGİN" : (avg > 3.5 ? "FAKİR" : "İDEAL");
                 td.classList.add(avg < -3.5 ? 'rich' : (avg > 3.5 ? 'lean' : 'ideal'));
                 
@@ -326,7 +326,7 @@
 
     function optimizeMap() {
         let allTrims = [];
-        Object.values(logData).forEach(arr => allTrims.push(...arr));
+        Object.values(logData).forEach(arr => allTrims.push(...arr.map(x => x.trim)));
         if (allTrims.length === 0) return alert("Hata: Önce bir sürüş logu yüklemelisiniz!");
 
         saveState();
@@ -346,7 +346,7 @@
             let newVal;
 
             if (logData[key]) {
-                const avg = logData[key].reduce((a,b)=>a+b,0) / logData[key].length;
+                const avg = logData[key].reduce((a,b)=>a+b.trim,0) / logData[key].length;
                 newVal = Math.round(oldVal * (1 + (avg * 0.75 / 100)));
             } else if (rIdx >= 8) {
                 // USTA UPGRADE 2: Open Loop Extrapolation (Dip Gaz Yansıtması)
@@ -356,7 +356,7 @@
                 for (let i = rIdx - 1; i >= 0; i--) {
                     let prevKey = `${cIdx}-${i}`;
                     if (logData[prevKey]) {
-                        lastValidAvg = logData[prevKey].reduce((a,b)=>a+b,0) / logData[prevKey].length;
+                        lastValidAvg = logData[prevKey].reduce((a,b)=>a+b.trim,0) / logData[prevKey].length;
                         break;
                     }
                 }
@@ -438,7 +438,7 @@
         // 2D Line Charts per RPM (Güncel vs Olması Gereken)
         var lineTraces = [];
         let allTrimsForTarget = [];
-        if (withTrims) { Object.values(logData).forEach(arr => allTrimsForTarget.push(...arr)); }
+        if (withTrims) { Object.values(logData).forEach(arr => allTrimsForTarget.push(...arr.map(x=>x.trim))); }
         const globalAvgTarget = allTrimsForTarget.length > 0 ? (allTrimsForTarget.reduce((a,b)=>a+b,0) / allTrimsForTarget.length) : 0;
         const globalBoostTarget = 1 + (Math.max(Math.min(globalAvgTarget, 12.0), -12.0) * 0.4 / 100);
         
@@ -457,7 +457,7 @@
                 if (withTrims) {
                     const key = `${cIdx}-${rIdx}`;
                     if (logData[key]) {
-                        const avg = logData[key].reduce((a,b)=>a+b,0) / logData[key].length;
+                        const avg = logData[key].reduce((a,b)=>a+b.trim,0) / logData[key].length;
                         yValsTarget.push(Math.round(currentVal * (1 + (avg * 0.75 / 100))));
                     } else {
                         yValsTarget.push(Math.round(currentVal * globalBoostTarget));
@@ -496,6 +496,7 @@
             var scatterSizes = [];
             var scatterColors = [];
             var scatterText = [];
+            var scatterCustomData = [];
             let maxLogLength = 1;
 
             for(let key in logData) {
@@ -509,7 +510,7 @@
                 scatterY.push(ROW_LABELS[r]);
                 
                 const t = logData[key];
-                const avg = t.reduce((a,b)=>a+b,0)/t.length;
+                const avg = t.reduce((a,b)=>a+b.trim,0)/t.length;
                 
                 // Çok veri olan büyük nokta, az veri olan küçük tam usta işi görselleştirme
                 const sSize = 10 + (t.length / maxLogLength) * 20; 
@@ -521,15 +522,27 @@
                 else if (avg > 3.5) cColor = '#0ea5e9'; // fakir
                 scatterColors.push(cColor);
 
-                scatterText.push(`Trim: ${avg > 0 ? '+' : ''}${avg.toFixed(1)}%<br>Örneklem: ${t.length}`);
+                scatterText.push(`Trim: ${avg > 0 ? '+' : ''}${avg.toFixed(1)}%<br>Örneklem: ${t.length}<br><i>👉 İncelemek için tıkla!</i>`);
+                scatterCustomData.push(t.map(obj => `[Trim: ${obj.trim > 0 ? '+' : ''}${obj.trim.toFixed(1)}% | MAP: ${(obj.map || 0).toFixed(1)} | RPM: ${obj.rpm}]`).join("\n"));
             }
 
             Plotly.newPlot('scatter2D', [
                 { z: zArr, x: RPMS, y: ROW_LABELS, type: 'heatmap', colorscale: 'Blues', opacity: 0.4, hoverinfo: 'none', showscale: false },
-                { x: scatterX, y: scatterY, mode: 'markers', type: 'scatter', marker: { size: scatterSizes, color: scatterColors, opacity: 0.9, line: {width: 2, color:'#fff'} }, text: scatterText, name: 'Toplanan Veriler', hoverinfo: 'text+x+y' }
+                { x: scatterX, y: scatterY, customdata: scatterCustomData, mode: 'markers', type: 'scatter', marker: { size: scatterSizes, color: scatterColors, opacity: 0.9, line: {width: 2, color:'#fff'} }, text: scatterText, name: 'Toplanan Veriler', hoverinfo: 'text+x+y' }
             ], {
-                title: '📌 2D Kesit: Harita Üzerindeki Veri İzlerimiz', template: 'plotly_dark', paper_bgcolor:'rgba(0,0,0,0)', margin: {l:50,r:20,b:40,t:40},
-                xaxis: { title: 'Motor Devri (RPM)', tickmode: 'array', tickvals: RPMS }, yaxis: { title: 'Yük / Enjeksiyon Süresi (ms)', autorange: 'reversed', type: 'category' }
+                title: '📌 2D Kesit (Hücrelere Tıklayarak Detayları İncele)', template: 'plotly_dark', paper_bgcolor:'rgba(0,0,0,0)', margin: {l:50,r:20,b:40,t:40},
+                xaxis: { title: 'Motor Devri (RPM)', tickmode: 'array', tickvals: RPMS }, yaxis: { title: 'Yük / Enjeksiyon Süresi (ms)', autorange: 'reversed', type: 'category' },
+                hovermode: 'closest'
+            });
+
+            // Tıklayınca 129 ham veriyi açan Röntgenci Algoritma
+            const s2dDiv = document.getElementById('scatter2D');
+            if (s2dDiv.removeAllListeners) s2dDiv.removeAllListeners('plotly_click');
+            s2dDiv.on('plotly_click', function(data){
+                const pt = data.points[0];
+                if (pt && pt.customdata) {
+                    alert(`Oksijen Sensöründen Gelen Ham Veriler (Röntgen)\n\nHücre: ${pt.x} Devir, ${pt.y} ms\nToplam Okuma: ${pt.customdata.split(',').length} Adet\n\nBütün Ham Değerler:\n${pt.customdata}`);
+                }
             });
 
             // 3D Trim Yüzeyi
@@ -538,7 +551,7 @@
                 const row = [];
                 RPMS.forEach((_, c) => {
                     const t = logData[`${c}-${r}`];
-                    row.push(t ? t.reduce((a,b)=>a+b,0)/t.length : null);
+                    row.push(t ? t.reduce((a,b)=>a+b.trim,0)/t.length : null);
                 });
                 trimZ.push(row);
             });
