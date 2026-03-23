@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LPG PRO Optimizer - Universal V5</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+    <script src="https://cdn.plot.ly/plotly-2.24.1.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=JetBrains+Mono&display=swap" rel="stylesheet">
+    <style>
+        :root { --bg: #090a0f; --card: rgba(18, 22, 36, 0.7); --header: #1f2937; --primary: #3b82f6; --primary-glow: rgba(59, 130, 246, 0.4); --secondary: #8b5cf6; --accent: #10b981; --text: #f3f4f6; --text-muted: #94a3b8; --border: rgba(255, 255, 255, 0.08); --rich: #ef4444; --lean: #0ea5e9; --ideal: #10b981; }
+        body { font-family: 'Outfit', sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 30px; background-image: radial-gradient(circle at top right, rgba(139, 92, 246, 0.1), transparent 40%), radial-gradient(circle at bottom left, rgba(59, 130, 246, 0.1), transparent 40%); background-attachment: fixed; min-height: 100vh; }
+        .container { max-width: 1400px; margin: 0 auto; background: var(--card); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); padding: 40px; border-radius: 24px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255,255,255,0.1); border: 1px solid var(--border); }
+        .header-section { text-align: center; margin-bottom: 40px; position: relative; }
+        h1 { background: linear-gradient(135deg, #60a5fa, #c084fc); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; font-size: 3.2em; font-weight: 800; margin: 0; letter-spacing: -1px; filter: drop-shadow(0 0 20px rgba(96, 165, 250, 0.2)); }
+        .subtitle { color: var(--text-muted); font-size: 1.15em; font-weight: 400; margin-top: 10px; letter-spacing: 0.5px; }
+        .top-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 25px; margin-bottom: 30px; }
+        .upload-zone { position: relative; overflow: hidden; border: 2px dashed rgba(255,255,255,0.2); padding: 30px; text-align: center; border-radius: 20px; cursor: pointer; transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1); background: rgba(0, 0, 0, 0.2); display: flex; flex-direction: column; justify-content: center; }
+        .upload-zone:hover { border-color: var(--primary); background: rgba(59, 130, 246, 0.05); transform: translateY(-2px); box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
+        .upload-zone::before { content: ""; position: absolute; top: 0; left: -100%; width: 50%; height: 100%; background: linear-gradient(to right, transparent, rgba(255,255,255,0.03), transparent); transform: skewX(-20deg); transition: 0.5s; }
+        .upload-zone:hover::before { left: 150%; }
+        .map-input-zone { background: rgba(0, 0, 0, 0.25); padding: 25px; border-radius: 20px; border: 1px solid var(--border); box-shadow: inset 0 2px 10px rgba(0,0,0,0.2); }
+        textarea { width: 100%; height: 100px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.1); color: var(--primary); border-radius: 12px; margin-top: 12px; font-family: 'JetBrains Mono', monospace; padding: 15px; font-size: 0.9em; resize: none; box-sizing: border-box; transition: 0.3s; }
+        textarea:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 15px rgba(59, 130, 246, 0.2); }
+        .status-bar { background: linear-gradient(90deg, rgba(8,10,16,0.8), rgba(18,25,38,0.8)); backdrop-filter: blur(10px); padding: 18px 25px; border-radius: 16px; font-family: 'Outfit', sans-serif; font-size: 0.95em; margin-bottom: 30px; border-left: 4px solid var(--primary); display: flex; justify-content: space-between; align-items: center; border-top: 1px solid rgba(255,255,255,0.05); border-right: 1px solid rgba(255,255,255,0.05); border-bottom: 1px solid rgba(255,255,255,0.05); box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
+        .stat-chip { background: rgba(255,255,255,0.05); padding: 6px 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); margin-left:12px; font-family: 'JetBrains Mono', monospace; font-size: 0.85em; color: var(--accent); box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .table-container { overflow-x: auto; border-radius: 16px; border: 1px solid var(--border); background: rgba(0,0,0,0.3); margin-top: 20px; box-shadow: 0 15px 35px rgba(0,0,0,0.3); }
+        table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        tr:hover td { background: rgba(255,255,255,0.03); }
+        th, td { padding: 12px 6px; text-align: center; border: 1px solid rgba(255,255,255,0.05); position: relative; transition: background 0.2s; }
+        th { background: rgba(255,255,255,0.03); color: var(--primary); font-weight: 600; font-size: 0.85em; letter-spacing: 0.5px; }
+        .header-edit { background: transparent; color: inherit; border: none; width: 50px; text-align: center; font-weight: 700; outline: none; border-bottom: 1px dashed rgba(255,255,255,0.3); cursor: pointer; transition: 0.2s; }
+        .header-edit:focus { border-bottom: 2px solid var(--primary); color: #fff; background: rgba(255,255,255,0.1); border-radius: 4px; }
+        .row-label-cell { background: rgba(0,0,0,0.4) !important; color: #fff; font-weight: 700; min-width: 60px; border-right: 2px solid rgba(255,255,255,0.05); }
+        .input-cell { background: transparent; color: white; border: none; width: 45px; text-align: center; font-weight: 600; outline: none; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); font-size: 1.1em; font-family: 'JetBrains Mono', monospace; }
+        .input-cell:focus { color: var(--primary); transform: scale(1.2); text-shadow: 0 0 10px rgba(59, 130, 246, 0.5); }
+        .rich { background: linear-gradient(135deg, rgba(239, 68, 68, 0.4), rgba(220, 38, 38, 0.5)) !important; color: white; }
+        .lean { background: linear-gradient(135deg, rgba(14, 165, 233, 0.4), rgba(2, 132, 199, 0.5)) !important; color: white; }
+        .ideal { background: linear-gradient(135deg, rgba(16, 185, 129, 0.3), rgba(5, 150, 105, 0.4)) !important; color: white; }
+        .status-tag { font-size: 8px; font-weight: 700; margin-top: 4px; opacity: 0.95; pointer-events: none; text-transform: uppercase; letter-spacing: 0.5px; }
+        .btn-group { display: flex; justify-content: center; flex-wrap: wrap; gap: 15px; margin-top: 35px; }
+        .btn { padding: 14px 28px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); cursor: pointer; font-weight: 600; color: white; background: linear-gradient(135deg, var(--primary), #2563eb); transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); display: flex; align-items: center; gap: 10px; box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3); font-size: 0.95em; letter-spacing: 0.5px; }
+        .btn:hover:not(:disabled) { transform: translateY(-3px); box-shadow: 0 8px 25px rgba(59, 130, 246, 0.5); border-color: rgba(255,255,255,0.3); }
+        .btn:active:not(:disabled) { transform: translateY(0); }
+        .btn:disabled { cursor: not-allowed; filter: grayscale(1); opacity: 0.5 !important; }
+        .btn-success { background: linear-gradient(135deg, #10b981, #059669); box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3); }
+        .btn-success:hover:not(:disabled) { box-shadow: 0 8px 25px rgba(16, 185, 129, 0.5); }
+        .btn-secondary { background: rgba(255,255,255,0.05); box-shadow: 0 4px 15px rgba(0,0,0,0.2); backdrop-filter: blur(5px); }
+        .btn-secondary:hover:not(:disabled) { background: rgba(255,255,255,0.1); box-shadow: 0 8px 25px rgba(0,0,0,0.3); }
+        .charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-top: 45px; }
+        .chart-card { background: rgba(0,0,0,0.25); border-radius: 20px; padding: 25px; border: 1px solid var(--border); height: 480px; box-shadow: inset 0 2px 15px rgba(0,0,0,0.2); position: relative; overflow: hidden; transition: 0.4s; }
+        .chart-card:hover { border-color: rgba(255,255,255,0.2); box-shadow: inset 0 2px 15px rgba(0,0,0,0.3), 0 10px 30px rgba(0,0,0,0.2); }
+        .instruction-box { margin-top: 25px; padding: 20px; border-radius: 16px; background: linear-gradient(to right, rgba(16, 185, 129, 0.05), rgba(0,0,0,0.2)); font-size: 0.9em; color: var(--text-muted); line-height: 1.6; border-left: 4px solid var(--accent); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); border-right: 1px solid var(--border); }
+        ::-webkit-scrollbar { width: 10px; height: 10px; }
+        ::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); border-radius: 10px; }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 10px; border: 2px solid transparent; background-clip: padding-box; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.4); background-clip: padding-box; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header-section">
+        <h1>LPG PRO Optimizer - Universal V6</h1>
+        <div class="subtitle">Atiker Fast 200 & Mükemmeliyetçi Algoritma Seviyesi</div>
+    </div>
+    
+    <div class="top-grid">
+        <div class="upload-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+            <input type="file" id="fileInput" accept=".csv" style="display:none">
+            <strong>📂 SÜRÜŞ LOGUNU (OBD) YÜKLE</strong>
+            <span id="fileName" style="margin-top:8px; color:var(--text-muted); font-size:0.9em;">Hızlı analiz için .csv seçin</span>
+        </div>
+        <div class="map-input-zone">
+            <label style="font-size:0.85em; color:var(--text-muted); font-weight:600;">MEVCUT HARİTANIZI YAPIŞTIRIN (Kopyala/Yapıştır):</label>
+            <textarea id="rawMapData" placeholder="Tüm sayıları seçin ve buraya yapıştırın. Sistem ızgarayı otomatik algılayacaktır..."></textarea>
+            <button class="btn btn-secondary" style="width:100%; margin-top:10px; padding:10px;" onclick="importManualMap()">📏 HARİTAYI ANALİZ ET VE BOYUTLANDIR</button>
+        </div>
+    </div>
+
+    <div id="statusBar" class="status-bar">
+        <div style="display:flex; flex-direction:column;">
+            <span id="statusTxt">📂 Adım 1: Haritayı yapıştırın veya Log yükleyin.</span>
+            <span id="trendInfo" style="font-size:0.8em; color:var(--text-muted); display:none; margin-top:2px;">Genel Sürüş Trendi: Bekleniyor...</span>
+        </div>
+        <div id="statsCloud" style="display:none">
+            <span class="stat-chip" id="rpmStat">RPM: 0</span>
+            <span class="stat-chip" id="trimStat">Veri: 0</span>
+        </div>
+    </div>
+    
+    <div class="table-container">
+        <table id="mapTable">
+            <thead><tr id="tableHeader"><th>ms \ RPM</th></tr></thead>
+            <tbody id="tableBody"></tbody>
+        </table>
+    </div>
+
+    <div class="btn-group">
+        <button class="btn btn-secondary" onclick="undoMap()" id="undoBtn" disabled style="opacity:0.5; font-size:1.2em;">↩️ GERİ</button>
+        <button class="btn" id="optBtn" onclick="optimizeMap()" style="font-size:1.1em; padding:12px 30px; transition: 0.3s;">🚀 PÜRÜZSÜZ (USTA) OPTİMİZASYON</button>
+        <button class="btn btn-secondary" onclick="manualSmooth()" style="font-size:1.1em; background:var(--secondary); color:white;">🧼 ÜTÜLE (Yumuşat)</button>
+        <button class="btn btn-success" onclick="copyResultMap()" style="font-size:1.1em;">📋 ATİKER'E YAPIŞTIR</button>
+    </div>
+
+    <div class="instruction-box">
+        <strong>Usta Tavsiyesi:</strong> Harita başlıklarını (RPM ve ms) kitine göre değiştirebilirsin. Başlıklara tıklayarak değerleri düzenle. Yapıştırdığın haritanın formatı ne olursa olsun (Tab veya Boşluk), sistem sütun ve satır sayısını otomatik tespit eder. Optimizasyon sonrası <strong>2D Smoothing</strong> filtreleri otomatik uygulanarak yüzey pürüzsüzleştirilir.
+    </div>
+
+    <div class="charts-grid">
+        <div style="grid-column: 1 / -1; display:flex; flex-direction:column; gap:15px;">
+            <div style="display:flex; justify-content:center; flex-wrap:wrap; gap:25px; background:rgba(0,0,0,0.4); padding:15px; border-radius:16px; border:1px solid var(--border); font-size:0.95em; color: var(--text-muted);">
+                <strong style="color:white; margin-right:10px;">📊 Veri İzleri (2D Harita) Bilgi Ekranı:</strong>
+                <span style="display:flex; align-items:center; gap:8px;"><div style="width:14px; height:14px; border-radius:50%; background:#ef4444; border:1px solid #fff; box-shadow: 0 0 8px #ef4444;"></div> <b style="color:#ef4444;">Kırmızı (Zengin):</b> Lpg fazla geliyor, sistem kısacak.</span>
+                <span style="display:flex; align-items:center; gap:8px;"><div style="width:14px; height:14px; border-radius:50%; background:#0ea5e9; border:1px solid #fff; box-shadow: 0 0 8px #0ea5e9;"></div> <b style="color:#0ea5e9;">Mavi (Fakir):</b> Lpg az kalıyor, sistem açacak.</span>
+                <span style="display:flex; align-items:center; gap:8px;"><div style="width:14px; height:14px; border-radius:50%; background:#10b981; border:1px solid #fff; box-shadow: 0 0 8px #10b981;"></div> <b style="color:#10b981;">Yeşil (İdeal):</b> Yakıt Karışımı mükemmel.</span>
+                <span style="display:flex; align-items:center; gap:8px; margin-left:15px;">
+                    <div style="width:8px; height:8px; border-radius:50%; background:#fff; opacity:0.7;"></div>
+                    <div style="width:14px; height:14px; border-radius:50%; background:#fff; opacity:0.7;"></div>
+                    <i>Büyük Nokta:</i> O hücrede çok sürüş (örneklem) yapılmış demektir.
+                </span>
+            </div>
+            <div class="chart-card" id="scatter2D" style="height:550px;"></div>
+        </div>
+        <div class="chart-card" id="line2D" style="grid-column: 1 / -1; height:500px;"></div>
+        <div class="chart-card" id="trim3D"></div>
+        <div class="chart-card" id="map3D"></div>
+    </div>
+</div>
+
+<script>
+    let RPMS = [500, 1000, 1500, 2000, 2500, 3000, 3500, 4000, 4500, 5000, 5500, 6000];
+    let ROW_LABELS = ["2.00", "2.50", "3.00", "3.50", "4.00", "4.50", "6.00", "8.00", "10.00", "12.00", "14.00", "16.00"];
+    let currentMap = [];
+    let logData = {};
+    let mapHistory = [];
+
+    function saveState() {
+        const rows = ROW_LABELS.length;
+        const cols = RPMS.length;
+        let pMap = [];
+        for (let r = 0; r < rows; r++) {
+            let row = [];
+            for (let c = 0; c < cols; c++) {
+                row.push(document.querySelector(`.input-cell[data-row-idx="${r}"][data-rpm-idx="${c}"]`).value);
+            }
+            pMap.push(row);
+        }
+        mapHistory.push(pMap);
+        const undoBtn = document.getElementById('undoBtn');
+        undoBtn.disabled = false;
+        undoBtn.style.opacity = '1';
+    }
+
+    function undoMap() {
+        if (mapHistory.length === 0) return;
+        const pMap = mapHistory.pop();
+        for (let r = 0; r < ROW_LABELS.length; r++) {
+            for (let c = 0; c < RPMS.length; c++) {
+                document.querySelector(`.input-cell[data-row-idx="${r}"][data-rpm-idx="${c}"]`).value = pMap[r][c];
+            }
+        }
+        if (mapHistory.length === 0) {
+            const undoBtn = document.getElementById('undoBtn');
+            undoBtn.disabled = true;
+            undoBtn.style.opacity = '0.5';
+        }
+        
+        // Geri alındığında optimizasyon kilidini aç
+        const optBtn = document.getElementById('optBtn');
+        if(optBtn) {
+            optBtn.disabled = false;
+            optBtn.innerText = "🚀 PÜRÜZSÜZ (USTA) OPTİMİZASYON";
+            optBtn.style.opacity = '1';
+        }
+        
+        resetVisuals();
+    }
+
+    function initTable() {
+        const head = document.getElementById('tableHeader');
+        head.innerHTML = '<th>ms \\ RPM</th>';
+        RPMS.forEach((r, idx) => {
+            head.innerHTML += `<th><input type="text" class="header-edit" data-idx="${idx}" value="${r}" onchange="updateAxis('rpm', this)"></th>`;
+        });
+        
+        const body = document.getElementById('tableBody');
+        body.innerHTML = '';
+        ROW_LABELS.forEach((label, rIdx) => {
+            let html = `<tr><td class="row-label-cell"><input type="text" class="header-edit" style="width:60px; color:white; border-bottom-color:var(--secondary);" data-idx="${rIdx}" value="${label}" onchange="updateAxis('row', this)"></td>`;
+            RPMS.forEach((rpm, cIdx) => {
+                const val = (currentMap[rIdx] && currentMap[rIdx][cIdx]) ? currentMap[rIdx][cIdx] : 150;
+                html += `<td><input type="number" class="input-cell" data-rpm-idx="${cIdx}" data-row-idx="${rIdx}" value="${val}"></td>`;
+            });
+            body.innerHTML += html + `</tr>`;
+        });
+        update3D(false);
+    }
+
+    function updateAxis(type, el) {
+        const idx = parseInt(el.dataset.idx);
+        if (type === 'rpm') RPMS[idx] = parseFloat(el.value);
+        else ROW_LABELS[idx] = el.value;
+        highlightCells(); update3D(Object.keys(logData).length > 0);
+    }
+
+    function importManualMap() {
+        const raw = document.getElementById('rawMapData').value.trim();
+        if(!raw) return alert("Lütfen harita verilerini yapıştırın!");
+        
+        const lines = raw.split("\n");
+        const cols = lines[0].trim().split(/\s+/).length;
+        const rows = lines.length;
+
+        // Auto-Resize RPMS and ROW_LABELS
+        if (cols !== RPMS.length || rows !== ROW_LABELS.length) {
+            RPMS = Array.from({length: cols}, (_, i) => (RPMS[i] || (RPMS[RPMS.length-1] + 500)));
+            ROW_LABELS = Array.from({length: rows}, (_, i) => (ROW_LABELS[i] || (parseFloat(ROW_LABELS[ROW_LABELS.length-1]) + 1.0).toFixed(2)));
+        }
+
+        currentMap = lines.map(line => line.trim().split(/\s+/).map(v => parseFloat(v)));
+        initTable();
+        document.getElementById('statusTxt').innerText = `✅ Harita yüklendi: ${rows} satır x ${cols} sütun.`;
+        highlightCells();
+    }
+
+    document.getElementById('fileInput').onchange = (e) => {
+        const file = e.target.files[0];
+        if(!file) return;
+        document.getElementById('fileName').innerText = file.name;
+        document.getElementById('statusTxt').innerText = "⏳ Log analiz ediliyor...";
+        
+        Papa.parse(file, {
+            encoding: "UTF-8", skipEmptyLines: true, delimiter: ";", 
+            complete: (results) => {
+                // Determine if encoding or delimiter needs adjustment
+                if (results.data[1] && results.data[1].length < 2) {
+                    Papa.parse(file, { encoding: "UTF-8", skipEmptyLines: true, complete: (res) => processLog(res.data)});
+                } else { processLog(results.data); }
+            }
+        });
+    };
+
+    function processLog(data) {
+        logData = {};
+        let stats = { rpmCount: 0, trimCount: 0 };
+        let state = { rpm: null, map: null, ltft: 0, stft: 0 };
+        
+        data.forEach(row => {
+            if(!row || row.length < 2) return;
+            const pid = row[1]?.toString().toLowerCase() || "";
+            const val = parseFloat(row[2]?.toString().replace(',', '.') || 0);
+
+            if (pid.includes("devir") || pid.includes("rpm")) {
+                state.rpm = pid.includes("x1000") ? val * 1000 : val;
+                stats.rpmCount++;
+            } else if (pid.includes("basin") || pid.includes("map") || pid.includes("manifol")) {
+                // BONUS: Eğer loglar kPa yerine PSI olarak kaydedilmişse otomatik kPa'ya çevir
+                state.map = (val > 0 && val <= 22) ? val * 6.89476 : val;
+            } else if (pid.includes("long term") || pid.includes("ltft")) {
+                state.ltft = val;
+            } else if (pid.includes("short term") || pid.includes("stft")) {
+                state.stft = val;
+                if (state.rpm > 100 && state.map != null) {
+                    const rpmIdx = RPMS.reduce((best, cur, i, arr) => Math.abs(cur-state.rpm) < Math.abs(arr[best]-state.rpm) ? i : best, 0);
+
+                    // USTA UPGRADE: OPEN LOOP (Açık Döngü) Koruması
+                    // Dip gazda (MAP >= 85 kPa) O2 sensörü devreden çıkar ve STFT 0'a kilitlenir. 
+                    // Motorun fakire çekilmesini (Sübap erimesini) engellemek için bu bölgedeki okumaları yoksayıyoruz.
+                    if (state.map >= 85) return;
+
+                    // Çift Eksenli (Hybrid) Yük Hesaplaması. %70 MAP, %30 RPM (Volumetrik Verim Katkısı)
+                    let loadRatio = Math.max(0, Math.min(1, (state.map - 20) / 80));
+                    let rpmFactor = Math.max(0, Math.min(1, state.rpm / 6000));
+                    let hybrid = (loadRatio * 0.70) + (rpmFactor * 0.30);
+                    const rowIdx = Math.round(hybrid * (ROW_LABELS.length - 1));
+
+                    const key = `${rpmIdx}-${rowIdx}`;
+                    if(!logData[key]) logData[key] = [];
+                    logData[key].push(state.ltft + state.stft);
+                    stats.trimCount++;
+                }
+            }
+        });
+
+        if (stats.trimCount === 0) { document.getElementById('statusTxt').innerText = "❌ Logda geçerli trim verisi bulunamadı."; }
+        else {
+            document.getElementById('statusTxt').innerText = `✅ Log okundu: ${stats.trimCount} analiz noktası.`;
+            document.getElementById('statsCloud').style.display = 'block';
+            document.getElementById('rpmStat').innerText = `Örnek: ${stats.trimCount}`;
+            
+            // Kilidi aç (Yeni log yüklendi)
+            const optBtn = document.getElementById('optBtn');
+            optBtn.disabled = false;
+            optBtn.innerText = "🚀 PÜRÜZSÜZ (USTA) OPTİMİZASYON";
+            optBtn.style.opacity = '1';
+
+            highlightCells(); update3D(true);
+        }
+    }
+
+    function highlightCells() {
+        document.querySelectorAll('.input-cell').forEach(inp => {
+            const rIdx = inp.dataset.rowIdx;
+            const cIdx = inp.dataset.rpmIdx;
+            const trims = logData[`${cIdx}-${rIdx}`];
+            const td = inp.parentElement;
+            
+            const oldStatus = td.querySelector('.status-tag');
+            if(oldStatus) oldStatus.remove();
+            td.className = '';
+
+            if (trims) {
+                const avg = trims.reduce((a,b)=>a+b,0)/trims.length;
+                let statusText = avg < -3.5 ? "ZENGİN" : (avg > 3.5 ? "FAKİR" : "İDEAL");
+                td.classList.add(avg < -3.5 ? 'rich' : (avg > 3.5 ? 'lean' : 'ideal'));
+                
+                const tag = document.createElement('div');
+                tag.className = 'status-tag';
+                tag.innerText = `${statusText} (${avg > 0 ? '+' : ''}${avg.toFixed(1)}%)`;
+                td.appendChild(tag);
+            }
+        });
+    }
+
+    function optimizeMap() {
+        let allTrims = [];
+        Object.values(logData).forEach(arr => allTrims.push(...arr));
+        if (allTrims.length === 0) return alert("Hata: Önce bir sürüş logu yüklemelisiniz!");
+
+        saveState();
+
+        const globalAvg = allTrims.reduce((a,b)=>a+b,0) / allTrims.length;
+        const globalBoost = 1 + (Math.max(Math.min(globalAvg, 12.0), -12.0) * 0.4 / 100);
+        
+        document.getElementById('trendInfo').style.display = 'block';
+        document.getElementById('trendInfo').innerText = `Genel Sürüş Trendi: %${globalAvg.toFixed(1)} (${globalAvg > 0 ? 'Fakir' : 'Zengin'})`;
+
+        // Pass 1: Local Correction + Global Lift + Open Loop Extrapolation
+        document.querySelectorAll('.input-cell').forEach(inp => {
+            const rIdx = parseInt(inp.dataset.rowIdx);
+            const cIdx = parseInt(inp.dataset.rpmIdx);
+            const key = `${cIdx}-${rIdx}`;
+            const oldVal = parseFloat(inp.value);
+            let newVal;
+
+            if (logData[key]) {
+                const avg = logData[key].reduce((a,b)=>a+b,0) / logData[key].length;
+                newVal = Math.round(oldVal * (1 + (avg * 0.75 / 100)));
+            } else if (rIdx >= 8) {
+                // USTA UPGRADE 2: Open Loop Extrapolation (Dip Gaz Yansıtması)
+                // WOT bölgesinde (10ms ve üstü) sensör körleştiği için oraları okumuyoruz. 
+                // Peki nasıl ayarlıyoruz? Aynı devir sütununda, altta kalan son güvenilir "Closed Loop" hatasını bulup aynen WOT hücresine aşılıyoruz!
+                let lastValidAvg = null;
+                for (let i = rIdx - 1; i >= 0; i--) {
+                    let prevKey = `${cIdx}-${i}`;
+                    if (logData[prevKey]) {
+                        lastValidAvg = logData[prevKey].reduce((a,b)=>a+b,0) / logData[prevKey].length;
+                        break;
+                    }
+                }
+                
+                if (lastValidAvg !== null) {
+                    newVal = Math.round(oldVal * (1 + (lastValidAvg * 0.75 / 100)));
+                } else {
+                    newVal = Math.round(oldVal * globalBoost);
+                }
+            } else {
+                newVal = Math.round(oldVal * globalBoost);
+            }
+            
+            // Atiker makul multiplier limitleri (Genelde 10-255 arası değerler güvenlidir)
+            inp.value = Math.max(10, Math.min(255, newVal));
+        });
+
+        // Pass 2: Master Smoothing (2D)
+        smoothSurface();
+        
+        // USTA UPGRADE: Double-Click Koruması
+        // Mükemmeliyetçi sistem aynı logu 2. kez haritaya yedirmemeli, yoksa motor boğulur!
+        const optBtn = document.getElementById('optBtn');
+        optBtn.disabled = true;
+        optBtn.innerText = "✅ MAP YAZILDI (Tekrar Log Gerekir)";
+        optBtn.style.opacity = '0.7';
+
+        highlightCells(); update3D(false);
+        alert("Optimizasyon uygulandı! (Eski hata hedefleri ekrandan temizlendi, saf haritanız gösteriliyor)");
+    }
+
+    function manualSmooth() {
+        saveState();
+        smoothSurface();
+        highlightCells(); update3D(Object.keys(logData).length > 0);
+    }
+
+    function smoothSurface() {
+        const rows = ROW_LABELS.length;
+        const cols = RPMS.length;
+        let grid = Array.from({length: rows}, (_, r) => 
+            Array.from({length: cols}, (_, c) => 
+                parseFloat(document.querySelector(`.input-cell[data-row-idx="${r}"][data-rpm-idx="${c}"]`).value)
+            )
+        );
+
+        for (let i = 0; i < rows; i++) {
+            for (let j = 0; j < cols; j++) {
+                let neighbors = [];
+                if (i > 0) neighbors.push(grid[i-1][j]);
+                if (i < rows - 1) neighbors.push(grid[i+1][j]);
+                if (j > 0) neighbors.push(grid[i][j-1]);
+                if (j < cols - 1) neighbors.push(grid[i][j+1]);
+
+                if (neighbors.length > 0) {
+                    // USTA UPGRADE: Alpha (0.6) ağırlıklı, haritanın orijinal genetiğini koruyan Pro Smoothing
+                    const nbAvg = neighbors.reduce((a,b)=>a+b,0) / neighbors.length;
+                    const alpha = 0.6; 
+                    const finalVal = Math.round(grid[i][j] * alpha + (nbAvg * (1 - alpha)));
+                    document.querySelector(`.input-cell[data-row-idx="${i}"][data-rpm-idx="${j}"]`).value = Math.max(10, Math.min(255, finalVal));
+                }
+            }
+        }
+    }
+
+    function update3D(withTrims) {
+        const zArr = [];
+        ROW_LABELS.forEach((_, r) => {
+            const row = [];
+            RPMS.forEach((_, c) => row.push(parseFloat(document.querySelector(`.input-cell[data-row-idx="${r}"][data-rpm-idx="${c}"]`).value)));
+            zArr.push(row);
+        });
+
+        Plotly.newPlot('map3D', [{ z: zArr, x: RPMS, y: ROW_LABELS, type: 'surface', colorscale: 'Viridis' }], {
+            title: 'Katsayı Yüzeyi', template: 'plotly_dark', paper_bgcolor: 'rgba(0,0,0,0)', margin: {l:0,r:0,b:0,t:40},
+            scene: { xaxis:{title:'RPM'}, yaxis:{title:'Yük'}, zaxis:{title:'Kat.'} }
+        });
+
+        // 2D Line Charts per RPM (Güncel vs Olması Gereken)
+        var lineTraces = [];
+        let allTrimsForTarget = [];
+        if (withTrims) { Object.values(logData).forEach(arr => allTrimsForTarget.push(...arr)); }
+        const globalAvgTarget = allTrimsForTarget.length > 0 ? (allTrimsForTarget.reduce((a,b)=>a+b,0) / allTrimsForTarget.length) : 0;
+        const globalBoostTarget = 1 + (Math.max(Math.min(globalAvgTarget, 12.0), -12.0) * 0.4 / 100);
+        
+        // Atiker arayüzündeki gibi güzel, okunaklı renkler atayalım
+        const rColors = ['#f44336', '#e91e63', '#9c27b0', '#673ab7', '#3f51b5', '#2196f3', '#03a9f4', '#00bcd4', '#009688', '#4caf50', '#8bc34a', '#ff9800'];
+
+        RPMS.forEach((rpm, cIdx) => {
+            var yValsCurrent = [];
+            var yValsTarget = [];
+            let color = rColors[cIdx % rColors.length];
+
+            ROW_LABELS.forEach((_, rIdx) => {
+                const currentVal = zArr[rIdx][cIdx];
+                yValsCurrent.push(currentVal);
+
+                if (withTrims) {
+                    const key = `${cIdx}-${rIdx}`;
+                    if (logData[key]) {
+                        const avg = logData[key].reduce((a,b)=>a+b,0) / logData[key].length;
+                        yValsTarget.push(Math.round(currentVal * (1 + (avg * 0.75 / 100))));
+                    } else {
+                        yValsTarget.push(Math.round(currentVal * globalBoostTarget));
+                    }
+                }
+            });
+
+            // "Güncel Çizgi" (Solid Line)
+            lineTraces.push({
+                x: ROW_LABELS, y: yValsCurrent, type: 'scatter', mode: 'lines+markers', name: rpm + ' RPM',
+                line: { shape: 'spline', smoothing: 0.2, width: 3, color: color }, marker: { size: 6, color: color },
+                legendgroup: rpm.toString()
+            });
+
+            // "Olması Gereken (Hedef) Çizgi" (Dashed Line)
+            if (withTrims) {
+                lineTraces.push({
+                    x: ROW_LABELS, y: yValsTarget, type: 'scatter', mode: 'lines', name: rpm + ' Hedef',
+                    line: { shape: 'spline', smoothing: 0.2, width: 2, dash: 'dot', color: color },
+                    opacity: 0.5, legendgroup: rpm.toString(), showlegend: false, hoverinfo: 'none'
+                });
+            }
+        });
+
+        const lTitle = withTrims ? '📈 Eğriler: Düz Çizgi = Güncel Harita | Kesikli Çizgi = Olması Gereken Harita' : '📈 RPM Bazlı Katsayı Eğrileri (Güncel Profil)';
+        Plotly.newPlot('line2D', lineTraces, {
+            title: lTitle, template: 'plotly_dark', paper_bgcolor:'rgba(0,0,0,0)', margin: {l:50,r:20,b:40,t:40},
+            xaxis: { title: 'Yük / Enjeksiyon Süresi (ms)', type: 'category' }, yaxis: { title: 'Katsayı Seçimi (Multiplier)' },
+            hovermode: 'closest', showlegend: true
+        });
+
+        if (withTrims) {
+            // scatter2D: Veri İzlerini ve Katsayı zeminini birleştiren 2D Grafik
+            var scatterX = [];
+            var scatterY = [];
+            var scatterSizes = [];
+            var scatterColors = [];
+            var scatterText = [];
+            let maxLogLength = 1;
+
+            for(let key in logData) {
+                let len = logData[key].length;
+                if(len > maxLogLength) maxLogLength = len;
+            }
+
+            for(let key in logData) {
+                let [c, r] = key.split('-');
+                scatterX.push(RPMS[c]);
+                scatterY.push(ROW_LABELS[r]);
+                
+                const t = logData[key];
+                const avg = t.reduce((a,b)=>a+b,0)/t.length;
+                
+                // Çok veri olan büyük nokta, az veri olan küçük tam usta işi görselleştirme
+                const sSize = 10 + (t.length / maxLogLength) * 20; 
+                scatterSizes.push(sSize);
+                
+                // Fakir kırmızıya, zengin maviye çalan renkler
+                let cColor = '#10b981'; // ideal
+                if(avg < -3.5) cColor = '#ef4444'; // zengin
+                else if (avg > 3.5) cColor = '#0ea5e9'; // fakir
+                scatterColors.push(cColor);
+
+                scatterText.push(`Trim: ${avg > 0 ? '+' : ''}${avg.toFixed(1)}%<br>Örneklem: ${t.length}`);
+            }
+
+            Plotly.newPlot('scatter2D', [
+                { z: zArr, x: RPMS, y: ROW_LABELS, type: 'heatmap', colorscale: 'Blues', opacity: 0.4, hoverinfo: 'none', showscale: false },
+                { x: scatterX, y: scatterY, mode: 'markers', type: 'scatter', marker: { size: scatterSizes, color: scatterColors, opacity: 0.9, line: {width: 2, color:'#fff'} }, text: scatterText, name: 'Toplanan Veriler', hoverinfo: 'text+x+y' }
+            ], {
+                title: '📌 2D Kesit: Harita Üzerindeki Veri İzlerimiz', template: 'plotly_dark', paper_bgcolor:'rgba(0,0,0,0)', margin: {l:50,r:20,b:40,t:40},
+                xaxis: { title: 'Motor Devri (RPM)', tickmode: 'array', tickvals: RPMS }, yaxis: { title: 'Yük / Enjeksiyon Süresi (ms)', autorange: 'reversed', type: 'category' }
+            });
+
+            // 3D Trim Yüzeyi
+            const trimZ = [];
+            ROW_LABELS.forEach((_, r) => {
+                const row = [];
+                RPMS.forEach((_, c) => {
+                    const t = logData[`${c}-${r}`];
+                    row.push(t ? t.reduce((a,b)=>a+b,0)/t.length : null);
+                });
+                trimZ.push(row);
+            });
+            Plotly.newPlot('trim3D', [{ z: trimZ, x: RPMS, y: ROW_LABELS, type: 'surface', colorscale: [[0,'#ef4444'],[0.5,'#fff'],[1,'#0ea5e9']] }], {
+                title: 'Hata Yüzeyi (%)', template: 'plotly_dark', paper_bgcolor:'rgba(0,0,0,0)', margin: {l:0,r:0,b:0,t:40},
+                scene: { xaxis:{title:'RPM'}, yaxis:{title:'Yük'}, zaxis:{title:'Trim %', range:[-25,25]}}
+            });
+        }
+    }
+
+    function copyResultMap() {
+        let output = "";
+        ROW_LABELS.forEach((_, r) => {
+            let row = [];
+            RPMS.forEach((_, c) => row.push(document.querySelector(`.input-cell[data-row-idx="${r}"][data-rpm-idx="${c}"]`).value));
+            output += row.join("\t") + "\n";
+        });
+        navigator.clipboard.writeText(output).then(() => alert("Yeni tablonuz kopyalandı! LPG programına yapıştırabilirsiniz."));
+    }
+
+    function resetVisuals() { highlightCells(); update3D(Object.keys(logData).length > 0); }
+
+    // Initial table setup
+    initTable();
+</script>
+
+</body>
+</html>
