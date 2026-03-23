@@ -271,7 +271,8 @@
 
                     // Çift Eksenli (Hybrid) Yük Hesaplaması. %70 MAP, %30 RPM (Volumetrik Verim Katkısı)
                     let loadRatio = Math.max(0, Math.min(1, (state.map - 20) / 80));
-                    let rpmFactor = Math.max(0, Math.min(1, state.rpm / 6000));
+                    let maxGridRpm = Math.max(...RPMS); // Otomatik olarak tavan devri algılar (16 sütun olursa 8000 vb)
+                    let rpmFactor = Math.max(0, Math.min(1, state.rpm / maxGridRpm));
                     let hybrid = (loadRatio * 0.70) + (rpmFactor * 0.30);
                     const rowIdx = Math.round(hybrid * (ROW_LABELS.length - 1));
 
